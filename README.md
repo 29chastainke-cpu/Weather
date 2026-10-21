@@ -18,28 +18,24 @@ periods, temperature, conditions, wind speed, and wind direction.
 
 Example coordinates: latitude `39.7456`, longitude `-97.0892`.
 
-## Deploy to Render
+## Publish with GitHub Pages
 
-The repository includes a Render Blueprint in `render.yaml`. To publish a
-public website:
+The repository includes a GitHub Actions Pages workflow. After the workflow
+completes, open
+<https://29chastainke-cpu.github.io/Weather/> for the forecast or
+<https://29chastainke-cpu.github.io/Weather/texas_map.html> for the Texas map.
 
-1. Sign in to [Render](https://render.com/).
-2. Choose **New** > **Blueprint** and connect the
-   [Weather GitHub repository](https://github.com/29chastainke-cpu/Weather).
-3. Select the `main` branch and deploy the `texas-weather` web service defined
-   in `render.yaml`.
-4. Open the public `onrender.com` URL Render assigns to the service.
+The Pages version is static HTML and JavaScript. The browser requests live
+forecasts and alerts from the National Weather Service API and radar frames
+from RainViewer; it does not run the Python server. The NWS API accepts the
+browser's built-in `User-Agent` and no API key is needed. Local development
+can still use `python web_app.py`.
 
-The server binds to Render's `PORT` and `HOST` environment variables in
-deployment, and uses `127.0.0.1:8765` for local development. No paid API key
-or Python package installation is required.
-
-Open <http://127.0.0.1:8765/map> for the Texas map. It labels major Texas
-cities, colors their forecast temperatures by range, and shows active NWS
-weather alert areas using colors for alert types. Map tiles are provided by
-OpenStreetMap. Temperature markers show the first NWS forecast period rather
-than live observations. The NWS API does not provide cold-front line geometry,
-so the map does not draw unverified front lines.
+The Texas map labels major Texas cities, colors their forecast temperatures by
+range, and shows active NWS weather alert areas using colors for alert types.
+Map tiles are provided by OpenStreetMap. Temperature markers show the first
+NWS forecast period rather than live observations. The NWS API does not
+provide cold-front line geometry, so the map does not draw unverified fronts.
 
 The map also includes an animated recent-radar layer. Recent scans play in a
 continuous loop with cross-fades between frames; use **Play/Pause** to control

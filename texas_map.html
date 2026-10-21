@@ -158,8 +158,8 @@
       </div>
     </div>
     <nav aria-label="Main navigation">
-      <a href="/">Forecast</a>
-      <a href="/map" aria-current="page">Texas map</a>
+      <a href="./index.html">Forecast</a>
+      <a href="./texas_map.html" aria-current="page">Texas map</a>
     </nav>
   </header>
   <main class="layout">
@@ -260,6 +260,27 @@
     const radarToggle = document.querySelector("#radar-toggle");
     const radarPlayButton = document.querySelector("#radar-play");
     const radarTime = document.querySelector("#radar-time");
+    const nwsBaseUrl = "https://api.weather.gov";
+    const texasCities = [
+      {name:"Amarillo",latitude:35.222,longitude:-101.831},
+      {name:"Lubbock",latitude:33.578,longitude:-101.855},
+      {name:"Wichita Falls",latitude:33.914,longitude:-98.493},
+      {name:"El Paso",latitude:31.762,longitude:-106.486},
+      {name:"Midland",latitude:31.998,longitude:-102.078},
+      {name:"Abilene",latitude:32.449,longitude:-99.733},
+      {name:"Tyler",latitude:32.351,longitude:-95.301},
+      {name:"Fort Worth",latitude:32.755,longitude:-97.330},
+      {name:"Dallas",latitude:32.777,longitude:-96.797},
+      {name:"Waco",latitude:31.549,longitude:-97.147},
+      {name:"Austin",latitude:30.267,longitude:-97.743},
+      {name:"Houston",latitude:29.760,longitude:-95.370},
+      {name:"San Antonio",latitude:29.425,longitude:-98.494},
+      {name:"Beaumont",latitude:30.080,longitude:-94.127},
+      {name:"Laredo",latitude:27.507,longitude:-99.508},
+      {name:"Corpus Christi",latitude:27.801,longitude:-97.396},
+      {name:"McAllen",latitude:26.204,longitude:-98.230},
+      {name:"Brownsville",latitude:25.902,longitude:-97.498}
+    ];
     let radarFrames = [];
     let radarHost = "";
     let radarIndex = 0;
@@ -282,6 +303,59 @@
       { source: [221, 168, 255], color: [59, 7, 100] },
       { source: [255, 255, 255], color: [59, 7, 100] }
     ];
+
+    async function fetchJson(url) {
+      const response = await fetch(url, {
+        headers: { "Accept": "application/geo+json" }
+      });
+      if (!response.ok) throw new Error(`Weather service returned HTTP ${response.status}.`);
+      return response.json();
+    }
+
+    async function loadCityForecast(city) {
+      const point = await fetchJson(
+        `${nwsBaseUrl}/points/${city.latitude},${city.longitude}`
+      );
+      const forecastUrl = point.properties?.forecast;
+      if (typeof forecastUrl !== "string") {
+        throw new Error("No forecast URL was returned.");
+      }
+      const forecastData = await fetchJson(forecastUrl);
+      const period = forecastData.properties?.periods?.[0];
+      if (!period) throw new Error("No forecast period was returned.");
+      return {
+        ...city,
+        temperature: period.temperature,
+        temperatureUnit: period.temperatureUnit || "F",
+        forecast: period.shortForecast || "Not available",
+        period: period.name || "Current forecast period",
+        forecastUrl
+      };
+    }
+
+    async function loadStaticTexasWeather() {
+      const results = [];
+      const errors = [];
+      let nextIndex = 0;
+      async function worker() {
+        while (nextIndex < texasCities.length) {
+          const city = texasCities[nextIndex++];
+          try {
+            results.push(await loadCityForecast(city));
+          } catch (error) {
+            errors.push(`${city.name}: ${error.message}`);
+          }
+        }
+      }
+      await Promise.all(Array.from({length: 4}, () => worker()));
+
+      const alertData = await fetchJson(`${nwsBaseUrl}/alerts/active?area=TX`);
+      return {
+        cities: results.sort((left, right) => left.name.localeCompare(right.name)),
+        alerts: Array.isArray(alertData.features) ? alertData.features : [],
+        errors
+      };
+    }
     const alertColors = {
       heat: "#e11d48",
       cold: "#2563eb",
@@ -428,9 +502,13 @@
 
     async function loadRadarFrames() {
       try {
-        const response = await fetch("/radar-frames");
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Radar data is unavailable.");
+        const response = await fetch("https://api.rainviewer.com/public/weather-maps.json");
+        if (!response.ok) throw new Error(`Radar service returned HTTP ${response.status}.`);
+        const radarData = await response.json();
+        const data = {
+          host: radarData.host,
+          frames: radarData.radar?.past?.slice(-12) || []
+        };
         if (!Array.isArray(data.frames) || !data.frames.length) {
           throw new Error("No recent radar frames were returned.");
         }
@@ -532,15 +610,16 @@
 
     async function loadTexasWeather() {
       try {
-        const response = await fetch("/texas-weather");
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || "Could not load Texas weather.");
+        const data = await loadStaticTexasWeather();
         for (const city of data.cities) addCity(city);
         for (const alert of data.alerts) addAlert(alert);
         showAlerts(data.alerts);
+        if (!data.cities.length) {
+          throw new Error(data.errors.join(" · ") || "No city forecasts were returned.");
+        }
         status.className = data.errors.length ? "status error" : "status";
         status.textContent = data.errors.length
-          ? `Map loaded with some unavailable data: ${data.errors.join(" · ")}`
+          ? `Showing ${data.cities.length} cities and ${data.alerts.length} alerts. Some city data is unavailable: ${data.errors.join(" · ")}`
           : `Showing forecasts for ${data.cities.length} Texas cities and ${data.alerts.length} active NWS alerts.`;
       } catch (error) {
         status.className = "status error";
