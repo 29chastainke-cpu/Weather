@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Texas Weather Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", sans-serif;
+      color: #172d45;
+      background: #edf4fa;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 14px clamp(18px, 4vw, 48px);
+      background: #fff;
+      border-bottom: 1px solid #dce7ef;
+    }
+    .brand { display: flex; align-items: center; gap: 14px; }
+    .brand-mark {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border-radius: 12px;
+      background: #e7f4f6;
+      color: #147d91;
+      font-size: 22px;
+    }
+    .eyebrow {
+      color: #147d91;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1 { margin: 2px 0 0; font-size: 20px; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; }
+    nav a {
+      padding: 9px 12px;
+      border-radius: 8px;
+      color: #425b71;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    nav a[aria-current="page"] { background: #e7f4f6; color: #116c7e; }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 18px;
+      width: min(1440px, 100%);
+      margin: 0 auto;
+      padding: 22px;
+    }
+    .map-column { min-width: 0; }
+    .map-heading { margin: 2px 0 14px; }
+    .map-heading h2 { margin: 0 0 5px; font-size: 23px; }
+    .map-heading p { margin: 0; color: #60758b; font-size: 13px; line-height: 1.5; }
+    #map {
+      width: 100%;
+      height: min(72vh, 760px);
+      min-height: 480px;
+      overflow: hidden;
+      border: 1px solid #cfdae5;
+      border-radius: 14px;
+      background: #dce9ef;
+      box-shadow: 0 8px 26px #243c5510;
+    }
+    .sidebar { display: flex; flex-direction: column; gap: 14px; }
+    .panel {
+      padding: 17px;
+      border: 1px solid #dce7ef;
+      border-radius: 14px;
+      background: #fff;
+      box-shadow: 0 8px 26px #243c5508;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: 15px; }
+    .layer-toggle {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 0;
+      border-top: 1px solid #edf1f5;
+      color: #425b71;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .layer-toggle input { margin: 3px 0 0; accent-color: #147d91; }
+    .layer-toggle strong { display: block; color: #172d45; }
+    .radar-controls { display: grid; gap: 10px; }
+    .radar-buttons { display: flex; align-items: center; gap: 10px; }
+    .radar-button {
+      padding: 8px 13px;
+      border: 0;
+      border-radius: 7px;
+      background: #147d91;
+      color: #fff;
+      cursor: pointer;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .radar-time { color: #425b71; font-size: 12px; font-weight: 600; }
+    .radar-credit { color: #60758b; font-size: 11px; }
+    .radar-pane .leaflet-layer { transition: opacity 500ms ease-in-out; }
+    .radar-credit a { color: #147d91; }
+    .legend { display: grid; gap: 8px; }
+    .legend-item { display: flex; align-items: center; gap: 9px; color: #425b71; font-size: 12px; }
+    .swatch { flex: 0 0 15px; width: 15px; height: 15px; border: 1px solid #20364c44; border-radius: 50%; }
+    .swatch.alert { border-radius: 4px; }
+    .status { margin: 0; color: #60758b; font-size: 13px; line-height: 1.5; }
+    .status.error { color: #b42318; }
+    #alerts-list { display: grid; gap: 9px; max-height: 300px; overflow: auto; }
+    .alert-entry { padding: 10px; border-left: 4px solid #7c3aed; border-radius: 5px; background: #f5f7fa; }
+    .alert-entry strong { display: block; margin-bottom: 4px; font-size: 12px; }
+    .alert-entry span { color: #60758b; font-size: 11px; line-height: 1.45; }
+    .note { color: #60758b; font-size: 11px; line-height: 1.5; }
+    .city-label {
+      padding: 2px 5px !important;
+      border: 1px solid #ffffffcc !important;
+      border-radius: 4px !important;
+      background: #14283dcc !important;
+      box-shadow: none !important;
+      color: white !important;
+      font-size: 10px !important;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .city-label:before { display: none; }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      #map { height: 60vh; min-height: 420px; }
+      .sidebar { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+    }
+    @media (max-width: 520px) {
+      header { align-items: flex-start; flex-direction: column; gap: 8px; }
+      .layout { padding: 15px; }
+      #map { height: 55vh; min-height: 380px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">⌁</div>
+      <div>
+        <div class="eyebrow">Student Weather Project</div>
+        <h1>Texas Weather</h1>
+      </div>
+    </div>
+    <nav aria-label="Main navigation">
+      <a href="/">Forecast</a>
+      <a href="/map" aria-current="page">Texas map</a>
+    </nav>
+  </header>
+  <main class="layout">
+    <section class="map-column" aria-labelledby="map-title">
+      <div class="map-heading">
+        <h2 id="map-title">Texas weather map</h2>
+        <p>Forecast temperatures across major Texas cities and active National Weather Service alerts.</p>
+      </div>
+      <div id="map" role="region" aria-label="Map of Texas weather and major cities"></div>
+    </section>
+    <aside class="sidebar" aria-label="Map layers and legend">
+      <section class="panel">
+        <h2>Map layers</h2>
+        <label class="layer-toggle">
+          <input id="temperature-toggle" type="checkbox" checked>
+          <span><strong>City forecast temperatures</strong>Color-coded markers at labeled cities</span>
+        </label>
+        <label class="layer-toggle">
+          <input id="alerts-toggle" type="checkbox" checked>
+          <span><strong>Active NWS alerts</strong>Shaded alert areas when boundary geometry is available</span>
+        </label>
+        <label class="layer-toggle">
+          <input id="radar-toggle" type="checkbox" checked>
+          <span><strong>Recent moving radar</strong>Recent precipitation radar observations</span>
+        </label>
+      </section>
+      <section class="panel">
+        <h2>Radar playback</h2>
+        <div class="radar-controls">
+          <div class="radar-buttons">
+            <button id="radar-play" class="radar-button" type="button">Pause</button>
+            <span id="radar-time" class="radar-time">Loading radar…</span>
+          </div>
+            <p class="note">The loop plays the latest recent radar scans. Rain echoes are colored from light yellow to dark purple by reflectivity intensity.</p>
+          <span class="radar-credit">Radar: <a href="https://www.rainviewer.com/" target="_blank" rel="noopener noreferrer">RainViewer</a> · map: OpenStreetMap</span>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Temperature scale</h2>
+        <div class="legend">
+          <div class="legend-item"><i class="swatch" style="background:#355cdb"></i>Below 32°F · Freezing</div>
+          <div class="legend-item"><i class="swatch" style="background:#4b8bea"></i>32–39°F · Cold</div>
+          <div class="legend-item"><i class="swatch" style="background:#45b8c7"></i>40–49°F · Cool</div>
+          <div class="legend-item"><i class="swatch" style="background:#4ca66b"></i>50–59°F · Mild</div>
+          <div class="legend-item"><i class="swatch" style="background:#d5bc47"></i>60–69°F · Pleasant</div>
+          <div class="legend-item"><i class="swatch" style="background:#ed8e35"></i>70–79°F · Warm</div>
+          <div class="legend-item"><i class="swatch" style="background:#d94b3d"></i>80°F and above · Hot</div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Radar echo intensity</h2>
+        <div class="legend">
+          <div class="legend-item"><i class="swatch" style="background:#fff2a6"></i>Light · under 20 dBZ</div>
+          <div class="legend-item"><i class="swatch" style="background:#ffe36a"></i>Light to moderate · 20–29 dBZ</div>
+          <div class="legend-item"><i class="swatch" style="background:#ffb64d"></i>Moderate · 30–39 dBZ</div>
+          <div class="legend-item"><i class="swatch" style="background:#f59e0b"></i>Strong · 40–49 dBZ</div>
+          <div class="legend-item"><i class="swatch" style="background:#cb4b83"></i>Very strong · 50–59 dBZ</div>
+          <div class="legend-item"><i class="swatch" style="background:#3b0764"></i>Heavy · 60+ dBZ</div>
+        </div>
+        <p class="note">Radar shows recent observed precipitation, not a forecast of future storm movement. RainViewer supplies 10-minute radar frames; the NWS forecast API does not supply animated radar imagery.</p>
+      </section>
+      <section class="panel">
+        <h2>Weather alerts</h2>
+        <div id="alerts-list"><p class="status">Loading Texas weather data…</p></div>
+      </section>
+      <section class="panel">
+        <h2>About the colors</h2>
+        <div class="legend">
+          <div class="legend-item"><i class="swatch alert" style="background:#e11d48"></i>Extreme heat / heat</div>
+          <div class="legend-item"><i class="swatch alert" style="background:#2563eb"></i>Cold / freeze / winter</div>
+          <div class="legend-item"><i class="swatch alert" style="background:#f59e0b"></i>Thunderstorm / severe weather</div>
+          <div class="legend-item"><i class="swatch alert" style="background:#06b6d4"></i>Flooding</div>
+          <div class="legend-item"><i class="swatch alert" style="background:#7c3aed"></i>Wind / other alerts</div>
+        </div>
+        <p class="note">City markers use the first NWS forecast period, not live thermometer readings. Alert colors show official active alert types. The NWS API used here does not provide cold-front line data, so fronts are not drawn as if they were observed.</p>
+      </section>
+      <p id="status" class="status" role="status">Loading forecasts and alerts…</p>
+    </aside>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map", { zoomControl: true, scrollWheelZoom: true });
+    const texasBounds = L.latLngBounds([[25.75, -106.7], [36.55, -93.45]]);
+    map.fitBounds(texasBounds, { padding: [12, 12] });
+    map.createPane("radarPane");
+    map.getPane("radarPane").style.zIndex = 350;
+    map.getPane("radarPane").classList.add("radar-pane");
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 18
+    }).addTo(map);
+
+    const temperatureLayer = L.layerGroup().addTo(map);
+    const alertsLayer = L.layerGroup().addTo(map);
+    const status = document.querySelector("#status");
+    const alertsList = document.querySelector("#alerts-list");
+    const radarToggle = document.querySelector("#radar-toggle");
+    const radarPlayButton = document.querySelector("#radar-play");
+    const radarTime = document.querySelector("#radar-time");
+    let radarFrames = [];
+    let radarHost = "";
+    let radarIndex = 0;
+    let radarLayer = null;
+    let radarTimer = null;
+    const radarPalette = [
+      { source: [223, 223, 223], color: [255, 242, 166] },
+      { source: [155, 234, 143], color: [255, 242, 166] },
+      { source: [88, 255, 66], color: [255, 227, 106] },
+      { source: [71, 194, 120], color: [255, 227, 106] },
+      { source: [71, 147, 249], color: [255, 182, 77] },
+      { source: [12, 89, 255], color: [255, 182, 77] },
+      { source: [97, 83, 193], color: [245, 158, 11] },
+      { source: [255, 147, 163], color: [245, 158, 11] },
+      { source: [255, 63, 53], color: [203, 75, 131] },
+      { source: [194, 5, 17], color: [203, 75, 131] },
+      { source: [255, 235, 10], color: [59, 7, 100] },
+      { source: [255, 152, 17], color: [59, 7, 100] },
+      { source: [168, 76, 6], color: [59, 7, 100] },
+      { source: [221, 168, 255], color: [59, 7, 100] },
+      { source: [255, 255, 255], color: [59, 7, 100] }
+    ];
+    const alertColors = {
+      heat: "#e11d48",
+      cold: "#2563eb",
+      storm: "#f59e0b",
+      flood: "#06b6d4",
+      wind: "#7c3aed",
+      other: "#7c3aed"
+    };
+
+    function temperatureColor(value) {
+      if (value < 32) return "#355cdb";
+      if (value < 40) return "#4b8bea";
+      if (value < 50) return "#45b8c7";
+      if (value < 60) return "#4ca66b";
+      if (value < 70) return "#d5bc47";
+      if (value < 80) return "#ed8e35";
+      return "#d94b3d";
+    }
+
+    function alertColor(eventName) {
+      const event = (eventName || "").toLowerCase();
+      if (event.includes("heat")) return alertColors.heat;
+      if (event.includes("cold") || event.includes("freeze") ||
+          event.includes("winter") || event.includes("snow") ||
+          event.includes("ice")) return alertColors.cold;
+      if (event.includes("thunderstorm") || event.includes("tornado") ||
+          event.includes("severe")) return alertColors.storm;
+      if (event.includes("flood")) return alertColors.flood;
+      if (event.includes("wind")) return alertColors.wind;
+      return alertColors.other;
+    }
+
+    function nearestRadarColor(red, green, blue) {
+      let nearest = radarPalette[0];
+      let nearestDistance = Infinity;
+      for (const entry of radarPalette) {
+        const redDifference = red - entry.source[0];
+        const greenDifference = green - entry.source[1];
+        const blueDifference = blue - entry.source[2];
+        const distance = redDifference * redDifference +
+          greenDifference * greenDifference + blueDifference * blueDifference;
+        if (distance < nearestDistance) {
+          nearest = entry;
+          nearestDistance = distance;
+        }
+      }
+      return nearest.color;
+    }
+
+    const RadarTileLayer = L.GridLayer.extend({
+      initialize: function (host, path) {
+        L.setOptions(this, {
+          tileSize: 256,
+          maxNativeZoom: 7,
+          maxZoom: 18,
+          pane: "radarPane",
+          opacity: 0.78
+        });
+        this.host = host;
+        this.path = path;
+      },
+      createTile: function (coords, done) {
+        const canvas = document.createElement("canvas");
+        const size = this.getTileSize();
+        canvas.width = size.x;
+        canvas.height = size.y;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        const image = new Image();
+        image.crossOrigin = "anonymous";
+        image.onload = () => {
+          try {
+            context.drawImage(image, 0, 0, size.x, size.y);
+            const pixels = context.getImageData(0, 0, size.x, size.y);
+            for (let offset = 0; offset < pixels.data.length; offset += 4) {
+              if (pixels.data[offset + 3] < 16) continue;
+              const color = nearestRadarColor(
+                pixels.data[offset],
+                pixels.data[offset + 1],
+                pixels.data[offset + 2]
+              );
+              pixels.data[offset] = color[0];
+              pixels.data[offset + 1] = color[1];
+              pixels.data[offset + 2] = color[2];
+            }
+            context.putImageData(pixels, 0, 0);
+            done(null, canvas);
+          } catch (error) {
+            done(error, canvas);
+          }
+        };
+        image.onerror = () => done(new Error("Radar tile could not be loaded."), canvas);
+        image.src = `${this.host}${this.path}/256/${coords.z}/${coords.x}/${coords.y}/2/0_0.png`;
+        return canvas;
+      }
+    });
+
+    function formatRadarTime(unixTime) {
+      return new Date(unixTime * 1000).toLocaleString([], {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: "UTC",
+        timeZoneName: "short"
+      });
+    }
+
+    function setRadarFrame(index) {
+      if (!radarFrames.length) return;
+      radarIndex = (index + radarFrames.length) % radarFrames.length;
+      radarTime.textContent = formatRadarTime(radarFrames[radarIndex].time);
+      if (!radarToggle.checked) return;
+      const previousLayer = radarLayer;
+      const nextLayer = new RadarTileLayer(radarHost, radarFrames[radarIndex].path);
+      nextLayer.setOpacity(previousLayer ? 0 : 0.78);
+      radarLayer = nextLayer;
+      nextLayer.once("load", () => {
+        if (radarLayer !== nextLayer) {
+          map.removeLayer(nextLayer);
+          return;
+        }
+        nextLayer.setOpacity(0.78);
+        if (previousLayer) {
+          previousLayer.setOpacity(0);
+          window.setTimeout(() => map.removeLayer(previousLayer), 550);
+        }
+      });
+      nextLayer.addTo(map);
+    }
+
+    function startRadarPlayback() {
+      if (radarTimer || radarFrames.length < 2) return;
+      radarPlayButton.textContent = "Pause";
+      radarTimer = window.setInterval(() => {
+        setRadarFrame(radarIndex + 1);
+      }, 1000);
+    }
+
+    function stopRadarPlayback() {
+      if (radarTimer) window.clearInterval(radarTimer);
+      radarTimer = null;
+      radarPlayButton.textContent = "Play";
+    }
+
+    async function loadRadarFrames() {
+      try {
+        const response = await fetch("/radar-frames");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Radar data is unavailable.");
+        if (!Array.isArray(data.frames) || !data.frames.length) {
+          throw new Error("No recent radar frames were returned.");
+        }
+        const currentTime = radarFrames.length
+          ? radarFrames[radarIndex]?.time
+          : null;
+        radarHost = data.host;
+        radarFrames = data.frames;
+        const matchingIndex = currentTime
+          ? radarFrames.findIndex(frame => frame.time === currentTime)
+          : -1;
+        setRadarFrame(matchingIndex >= 0 ? matchingIndex : radarFrames.length - 1);
+        if (radarFrames.length < 2) {
+          stopRadarPlayback();
+          radarPlayButton.disabled = true;
+        } else {
+          radarPlayButton.disabled = false;
+          if (!radarTimer) startRadarPlayback();
+        }
+      } catch (error) {
+        radarTime.textContent = `Radar unavailable: ${error.message}`;
+        radarPlayButton.disabled = true;
+      }
+    }
+
+    function addCity(city) {
+      if (typeof city.latitude !== "number" ||
+          typeof city.longitude !== "number" ||
+          typeof city.temperature !== "number") return;
+      const marker = L.circleMarker([city.latitude, city.longitude], {
+        radius: 8,
+        color: "#fff",
+        weight: 2,
+        fillColor: temperatureColor(city.temperature),
+        fillOpacity: 0.95
+      });
+      const popup = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = city.name;
+      const reading = document.createElement("div");
+      reading.textContent = `${city.temperature}°${city.temperatureUnit || "F"} · ${city.period}`;
+      const conditions = document.createElement("div");
+      conditions.textContent = city.forecast || "Forecast unavailable";
+      popup.append(name, reading, conditions);
+      marker.bindPopup(popup);
+      marker.bindTooltip(city.name, {
+        permanent: true,
+        direction: "top",
+        offset: [0, -8],
+        className: "city-label"
+      });
+      marker.addTo(temperatureLayer);
+    }
+
+    function addAlert(feature) {
+      const eventName = feature.properties?.event || "Weather alert";
+      const headline = feature.properties?.headline || eventName;
+      if (!feature.geometry) return;
+      const layer = L.geoJSON(feature, {
+        style: {
+          color: alertColor(eventName),
+          weight: 2,
+          fillColor: alertColor(eventName),
+          fillOpacity: 0.2
+        }
+      });
+      const popup = document.createElement("div");
+      const title = document.createElement("strong");
+      title.textContent = headline;
+      const area = document.createElement("div");
+      area.textContent = feature.properties?.areaDesc || "";
+      popup.append(title, area);
+      layer.bindPopup(popup);
+      layer.addTo(alertsLayer);
+    }
+
+    function showAlerts(alerts) {
+      alertsList.replaceChildren();
+      if (!alerts.length) {
+        const empty = document.createElement("p");
+        empty.className = "status";
+        empty.textContent = "No active NWS alerts for Texas.";
+        alertsList.append(empty);
+        return;
+      }
+      for (const alert of alerts) {
+        const props = alert.properties || {};
+        const entry = document.createElement("div");
+        entry.className = "alert-entry";
+        entry.style.borderLeftColor = alertColor(props.event);
+        const title = document.createElement("strong");
+        title.textContent = props.headline || props.event || "Weather alert";
+        const detail = document.createElement("span");
+        detail.textContent = `${props.severity || "Severity unavailable"} · ${props.areaDesc || "Texas"}`;
+        entry.append(title, detail);
+        alertsList.append(entry);
+      }
+    }
+
+    async function loadTexasWeather() {
+      try {
+        const response = await fetch("/texas-weather");
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not load Texas weather.");
+        for (const city of data.cities) addCity(city);
+        for (const alert of data.alerts) addAlert(alert);
+        showAlerts(data.alerts);
+        status.className = data.errors.length ? "status error" : "status";
+        status.textContent = data.errors.length
+          ? `Map loaded with some unavailable data: ${data.errors.join(" · ")}`
+          : `Showing forecasts for ${data.cities.length} Texas cities and ${data.alerts.length} active NWS alerts.`;
+      } catch (error) {
+        status.className = "status error";
+        status.textContent = `Texas weather data could not be loaded: ${error.message}`;
+        alertsList.replaceChildren();
+        const message = document.createElement("p");
+        message.className = "status error";
+        message.textContent = "Alerts are unavailable until the weather service responds.";
+        alertsList.append(message);
+      }
+    }
+
+    document.querySelector("#temperature-toggle").addEventListener("change", event => {
+      if (event.target.checked) temperatureLayer.addTo(map);
+      else map.removeLayer(temperatureLayer);
+    });
+    document.querySelector("#alerts-toggle").addEventListener("change", event => {
+      if (event.target.checked) alertsLayer.addTo(map);
+      else map.removeLayer(alertsLayer);
+    });
+    radarToggle.addEventListener("change", event => {
+      if (event.target.checked) setRadarFrame(radarIndex);
+      else if (radarLayer) map.removeLayer(radarLayer);
+    });
+    radarPlayButton.addEventListener("click", () => {
+      if (radarTimer) stopRadarPlayback();
+      else startRadarPlayback();
+    });
+    loadTexasWeather();
+    loadRadarFrames();
+    window.setInterval(loadRadarFrames, 5 * 60 * 1000);
+  </script>
+</body>
+</html>
