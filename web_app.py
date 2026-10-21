@@ -1,6 +1,7 @@
 """Run the weather app as a local browser interface."""
 
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -8,8 +9,8 @@ from weather_app import WeatherAPIError, get_forecast
 from texas_weather import get_radar_frames, get_texas_map_data
 
 
-HOST = "127.0.0.1"
-PORT = 8765
+HOST = os.environ.get("HOST", "127.0.0.1")
+PORT = int(os.environ.get("PORT", "8765"))
 
 PAGE = """<!doctype html>
 <html lang="en">
