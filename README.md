@@ -24,6 +24,8 @@ The repository includes a GitHub Actions Pages workflow. After the workflow
 completes, open
 <https://29chastainke-cpu.github.io/Weather/> for the forecast or
 <https://29chastainke-cpu.github.io/Weather/texas_map.html> for the Texas map.
+Both pages include a direct link to the
+[GitHub repository](https://github.com/29chastainke-cpu/Weather).
 
 The Pages version is static HTML and JavaScript. The browser requests live
 forecasts and alerts from the National Weather Service API and radar frames
@@ -39,10 +41,10 @@ provide cold-front line geometry, so the map does not draw unverified fronts.
 
 The map also includes an animated recent-radar layer. Recent scans play in a
 continuous loop with cross-fades between frames; use **Play/Pause** to control
-the animation. Radar echoes are recolored from light yellow through orange and
-pink to dark purple by reflectivity intensity. The
-National Weather Service API used for forecasts does not publish animated
-radar imagery, so this layer uses RainViewer's public radar API and credits
+the animation. Radar uses RainViewer's native reflectivity palette, including
+pink for strong echoes, and loads tiles as images without cross-origin canvas
+access. The National Weather Service API does not publish animated radar
+imagery, so this layer uses RainViewer's public radar API and credits
 RainViewer on the map. The radar is a recent observation loop, not a forecast
 of where a weather system will move next.
 
